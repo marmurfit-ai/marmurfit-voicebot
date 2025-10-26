@@ -1,0 +1,121 @@
+{
+  "brand": "MARMURFIT",
+  "currency": "RON",
+  "units": {
+    "area": "m²",
+    "linear": "ml",
+    "width": "cm"
+  },
+  "hours": {
+    "factory": "Luni–Vineri 09:00–18:00",
+    "bot": "24/7"
+  },
+  "services": {
+    "processing_only": true,
+    "installation": false,
+    "on_site_measurements": false,
+    "shipping": "Expediem în toată țara prin parteneri transportatori. Costul se calculează în ofertă.",
+    "cutting_precision": "Tăiem milimetric la comandă pe dimensiunile clientului.",
+    "measurement_policy": {
+      "customer_supplied": true,
+      "tolerance_tip": "Clientul trebuie să lase toleranță de ~2 cm la capete și în față; treptele ies în exterior față de contratrepte.",
+      "no_fixed_sizes": "Nu oferim dimensiuni fixe; prelucrăm strict pe dimensiunile furnizate de client."
+    },
+    "conversions": {
+      "ml_from_length_width": "Putem face conversia în metri liniari după ce avem lungimea și lățimea.",
+      "m2_from_ml_width": "m² = (lățime_cm / 100) × lungime_ml"
+    }
+  },
+  "materials": [
+    {
+      "name": "gri",
+      "price_per_m2": 350,
+      "finishes": [
+        "polished",
+        "leathered",
+        "mat"
+      ]
+    },
+    {
+      "name": "marmura alba cu dungi gri",
+      "price_per_m2": 350,
+      "finishes": [
+        "polished",
+        "leathered",
+        "mat"
+      ]
+    },
+    {
+      "name": "marmura bej",
+      "price_per_m2": 350,
+      "finishes": [
+        "polished",
+        "leathered",
+        "mat"
+      ]
+    },
+    {
+      "name": "gri antracit",
+      "price_per_m2": 350,
+      "finishes": [
+        "polished",
+        "leathered",
+        "mat"
+      ]
+    },
+    {
+      "name": "negru galaxy",
+      "price_per_m2": 750,
+      "finishes": [
+        "polished",
+        "leathered",
+        "mat"
+      ]
+    },
+    {
+      "name": "negru absolut",
+      "price_per_m2": 750,
+      "finishes": [
+        "polished",
+        "leathered",
+        "mat"
+      ]
+    },
+    {
+      "name": "steel black",
+      "price_per_m2": 650,
+      "finishes": [
+        "polished",
+        "leathered",
+        "mat"
+      ]
+    }
+  ],
+  "edge_profiles": [
+    "drept",
+    "micro-teșit",
+    "bullnose discret"
+  ],
+  "thicknesses_cm": [
+    2,
+    3
+  ],
+  "advance_policy": {
+    "short": "Lucrăm exclusiv cu avans minim 50% înainte de producție.",
+    "reason": "Toate comenzile sunt tăiate milimetric pe dimensiunile clientului.",
+    "doc_ref": "Regulament intern MARMURFIT – versiunea curentă."
+  },
+  "pricing_notes": [
+    "Prețurile sunt orientative pe m². Operații speciale se bugetează separat.",
+    "Nu oferim montaj; livrăm piese finisate premium, gata de instalare de către client/echipa clientului."
+  ],
+  "languages": [
+    "ro",
+    "en"
+  ],
+  "voice": {
+    "gender": "female",
+    "name_hint": "feminin natural RO/EN"
+  },
+  "generated_at": "2025-10-26T10:06:05.772562Z"
+}

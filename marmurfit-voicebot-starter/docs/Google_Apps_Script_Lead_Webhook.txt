@@ -1,0 +1,33 @@
+function doPost(e) {
+  const ss = SpreadsheetApp.openById('SPREADSHEET_ID'); // <-- INLOCUIESTE
+  const sheet = ss.getSheetByName('Leads');
+  const data = JSON.parse(e.postData.contents);
+
+  const row = [
+    data.id || '',
+    new Date(),
+    data.sursa || 'apel',
+    data.nume || '',
+    data.telefon || '',
+    data.localitate || '',
+    data.tip_lucrare || '',
+    data.material || '',
+    data.finisaj || '',
+    data.grosime_cm || '',
+    data.dimensiuni_text || '',
+    data.suprafata_m2 || '',
+    data.lungime_ml || '',
+    data.latime_cm || '',
+    data.estimare_ron || '',
+    data.buget_ron || '',
+    data.termen || '',
+    data.modalitate_contact || '',
+    data.owner || '',
+    data.status || 'nou',
+    data.observatii || ''
+  ];
+  sheet.appendRow(row);
+
+  return ContentService.createTextOutput(JSON.stringify({ok:true}))
+        .setMimeType(ContentService.MimeType.JSON);
+}

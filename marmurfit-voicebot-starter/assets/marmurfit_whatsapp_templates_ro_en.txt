@@ -1,0 +1,19 @@
+[MARMURFIT • WhatsApp Templates]
+
+1) RO – Rezumat ofertă
+Salut, {Nume}! Rezumat cerere: {tip_lucrare}, material {material}, finisaj {finisaj}, grosime {grosime_cm} cm, dimensiuni {dimensiuni}. Estimare orientativă: ~{estimare_ron} RON (fără transport/operații speciale). Nu oferim montaj; tăiem milimetric pe dimensiunile tale și expediem în toată țara. Avans minim 50% înainte de producție. Te ajut să continui cu oferta detaliată?
+
+2) EN – Quote summary
+Hi {Name}! Request summary: {work_type}, material {material}, finish {finish}, thickness {thickness_cm} cm, sizes {sizes}. Indicative estimate: ~{estimate_ron} RON (excludes shipping/special ops). No installation; we cut to the millimeter to your sizes and ship nationwide. 50% upfront before production. Would you like to proceed with a detailed quote?
+
+3) RO – Politică măsurători/toleranțe
+Notă MARMURFIT: lucrăm pe dimensiunile transmise de client. Recomandăm toleranță ~2 cm la capete și în față; treptele trebuie să iasă în exterior față de contratrepte. Nu oferim dimensiuni fixe.
+
+4) EN – Measurements/tolerances
+MARMURFIT note: we work with client-provided sizes. Please keep ~2 cm tolerance at the ends and front; steps should overhang risers. We don’t provide fixed sizes.
+
+5) RO – Confirmare programare vizită (showroom/fabrică)
+Confirmare programare MARMURFIT: {data} {ora}, la fabrică (program L–V 09:00–18:00). Dacă vrei să reprogramezi, răspunde acestui mesaj.
+
+6) EN – Visit confirmation (showroom/factory)
+MARMURFIT appointment confirmation: {date} {time}, at the factory (Mon–Fri 09:00–18:00). Reply to reschedule if needed.

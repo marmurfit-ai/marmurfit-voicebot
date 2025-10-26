@@ -1,0 +1,83 @@
+{
+  "description": "MARMURFIT IVR skeleton",
+  "states": [
+    {
+      "name": "Trigger",
+      "type": "trigger",
+      "transitions": [
+        {
+          "event": "incomingCall",
+          "next": "Menu"
+        }
+      ]
+    },
+    {
+      "name": "Menu",
+      "type": "split-based-on",
+      "properties": {
+        "input": "{{widgets.gather.Digits}}"
+      },
+      "transitions": [
+        {
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "1",
+              "arguments": [
+                "1"
+              ],
+              "type": "equal_to"
+            }
+          ],
+          "next": "NewQuote"
+        },
+        {
+          "event": "noMatch",
+          "next": "Gather"
+        }
+      ]
+    },
+    {
+      "name": "Gather",
+      "type": "gather-input-on-call",
+      "properties": {
+        "speech_timeout": "auto",
+        "speech_model": "default",
+        "say": "Buna! Pentru oferta apasa 1 sau spune 'oferta'."
+      },
+      "transitions": [
+        {
+          "event": "keypress",
+          "next": "Menu"
+        },
+        {
+          "event": "speech",
+          "next": "NewQuote"
+        }
+      ]
+    },
+    {
+      "name": "NewQuote",
+      "type": "make-http-request",
+      "properties": {
+        "method": "POST",
+        "content_type": "application/x-www-form-urlencoded",
+        "url": "https://EXEMPLU-URL/voice"
+      },
+      "transitions": [
+        {
+          "event": "success",
+          "next": "HANGUP"
+        }
+      ]
+    },
+    {
+      "name": "HANGUP",
+      "type": "hangup"
+    }
+  ],
+  "initial_state": "Trigger",
+  "flags": {
+    "allow_concurrent_calls": true
+  }
+}
