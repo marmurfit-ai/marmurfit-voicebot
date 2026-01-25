@@ -145,6 +145,31 @@ def final():
 @app.route("/")
 def health():
     return "OK - MARMURFIT Voice Bot MVP"
+    @app.route("/selftest", methods=["GET"])
+def selftest():
+    import requests, time
+    payload = {
+        "sursa": "selftest-backend",
+        "nume": "Test",
+        "telefon": "",
+        "localitate": "",
+        "tip_lucrare": "glafuri",
+        "material": "gri",
+        "finisaj": "",
+        "grosime_cm": "2",
+        "suprafata_m2": 1,
+        "latime_cm": "",
+        "lungime_ml": "",
+        "estimare_ron": 350,
+        "status": "nou",
+        "observatii": "trigger din /selftest"
+    }
+    try:
+        r = requests.post(LEADS_WEBHOOK_URL, json=payload, timeout=10)
+        status = r.status_code
+    except Exception as e:
+        status = f"ERR:{e}"
+    return f"SELFTEST -> Sheets status: {status} @ {time.strftime('%H:%M:%S')}"
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
