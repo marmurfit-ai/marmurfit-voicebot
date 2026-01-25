@@ -145,8 +145,7 @@ def final():
 @app.route("/")
 def health():
     return "OK - MARMURFIT Voice Bot MVP"
-    @app.route("/selftest", methods=["GET"])
-    # --- SELFTEST START ---
+# --- SELFTEST START ---
 @app.route("/selftest", methods=["GET"])
 def selftest():
     import requests, time
@@ -174,10 +173,6 @@ def selftest():
     return f"SELFTEST -> Sheets status: {status} @ {time.strftime('%H:%M:%S')}"
 # --- SELFTEST END ---
 
-if __name__ == "__main__":
-    import os
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-    
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
