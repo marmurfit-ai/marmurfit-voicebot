@@ -173,6 +173,12 @@ def selftest():
     return f"SELFTEST -> Sheets status: {status} @ {time.strftime('%H:%M:%S')}"
 # --- SELFTEST END ---
 
+# --- TELNYX XML HELPER ---
+from flask import request  # dacă nu e deja importat mai sus
+
+def make_texml(xml_str: str):
+    return Response(xml_str, mimetype="application/xml")
+
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
