@@ -1,39 +1,30 @@
-
-import os, json, requests
+import os, json, re, requests
 from flask import Flask, request, Response
-from twilio.twiml.voice_response import VoiceResponse, Gather
 
-# =====================================
-# MARMURFIT Voice Bot - Beginner Starter
-# =====================================
-# What this file does:
-# - receives phone calls via Twilio (/voice route)
-# - says the intro + asks the client for details
-# - computes a very simple rough estimate
-# - pushes a draft lead to Google Sheets (via LEADS_WEBHOOK_URL)
-#
-# NOTE: This is a very simple MVP to get started.
-# Later you can add LLM intelligence and WhatsApp sending.
-# =====================================
+# ================================
+# MARMURFIT Voice Bot - Full MVP
+# ================================
 
 app = Flask(__name__)
 
-# Load Knowledge Base and System Prompt
+# --- KB + Prompt (existente în repo) ---
 KB = json.load(open("marmurfit_kb.json", encoding="utf-8"))
 SYSTEM_PROMPT = open("marmurfit_system_prompt.txt", encoding="utf-8").read()
 
-LEADS_WEBHOOK_URL = os.getenv("LEADS_WEBHOOK_URL", "")  # set in .env on the server
+# --- ENV ---
+LEADS_WEBHOOK_URL = os.getenv("LEADS_WEBHOOK_URL", "").strip()
 
+# =========================
+# UTIL & BUSINESS HELPERS
+# =========================
 def get_price_per_m2(material_name: str):
-    """Returns price per m2 for the given material (or None if not found)."""
-    material_name = (material_name or "").strip().lower()
+    mname = (material_name or "").strip().lower()
     for m in KB.get("materials", []):
-        if m["name"].lower() == material_name:
+        if m["name"].lower() == mname:
             return m["price_per_m2"]
     return None
 
 def estimate_from_area(material_name: str, area_m2: float):
-    """Computes rough estimate from area and material price."""
     try:
         area = float(area_m2)
     except:
@@ -44,9 +35,8 @@ def estimate_from_area(material_name: str, area_m2: float):
     return round(area * price)
 
 def push_lead_to_sheet(payload: dict):
-    """Sends the lead to Google Sheets (Apps Script webhook)."""
     if not LEADS_WEBHOOK_URL:
-        print("LEADS_WEBHOOK_URL missing - set it in .env")
+        print("LEADS_WEBHOOK_URL missing")
         return
     try:
         r = requests.post(LEADS_WEBHOOK_URL, json=payload, timeout=10)
@@ -54,101 +44,45 @@ def push_lead_to_sheet(payload: dict):
     except Exception as e:
         print("Lead push error:", e)
 
-@app.route("/voice", methods=["POST"])
-def voice():
-    """Entry point for incoming calls."""
-    vr = VoiceResponse()
-    g = Gather(input="speech", action="/collect", language="ro-RO", speech_timeout="auto")
-    g.say("Buna! Ai sunat la MARMURFIT. Pentru calitate, apelul poate fi inregistrat. "
-          "Iti pot face o estimare orientativa. Nu facem masuratori la domiciliu, "
-          "lucram pe dimensiunile tale si recomandam toleranta de aproximativ doi centimetri "
-          "la capete si in fata, pentru ca treptele ies in exterior fata de contratrepte. "
-          "Spune-mi, te rog, materialul si suprafata in metri patrati, "
-          "sau pentru glafuri latimea in centimetri si lungimea in metri liniari.")
-    vr.append(g)
-    vr.redirect("/voice")  # if no speech
-    return Response(str(vr), mimetype="text/xml")
-
-@app.route("/collect", methods=["POST"])
-def collect():
-    """Collect user answer and try to compute a rough estimate."""
-    user_text = request.form.get("SpeechResult", "") or ""
-
-    text_low = user_text.lower()
-
-    # 1) find material in the KB by name
-    material = None
+def find_material_in_text(t: str):
+    t = (t or "").lower()
     for m in KB.get("materials", []):
-        if m["name"].lower() in text_low:
-            material = m["name"]
-            break
+        if m["name"].lower() in t:
+            return m["name"]
+    return None
 
-    # 2) extract numbers from text
-    import re
-    nums = re.findall(r"[0-9]+[.,]?[0-9]*", text_low)
-    nums = [n.replace(",", ".") for n in nums]
+def parse_area_from_text(t: str):
+    """
+    Returnează (area_m2, latime_cm, lungime_ml)
+    Reguli:
+      - Dacă textul conține "cm" și "ml" => glafuri: m2 = (lat_cm/100) * lung_ml
+      - Altfel, dacă apare "m2" / "metri patrati" => ia primul număr ca m2
+    """
+    t_low = (t or "").lower()
+    nums = [n.replace(",", ".") for n in re.findall(r"[0-9]+[.,]?[0-9]*", t_low)]
+    area_m2, lat_cm, lng_ml = None, None, None
 
-    area_m2 = None
-    latime_cm = None
-    lungime_ml = None
+    if "cm" in t_low and ("ml" in t_low or "m liniar" in t_low or "metri liniari" in t_low) and len(nums) >= 2:
+        lat_cm = float(nums[0]); lng_ml = float(nums[1])
+        area_m2 = (lat_cm / 100.0) * lng_ml
+    elif ("m2" in t_low) or ("metri patrati" in t_low) or ("metri pătrați" in t_low) or ("metru patrat" in t_low):
+        if nums:
+            area_m2 = float(nums[0])
 
-    # If both "cm" and "ml" appear and we have at least 2 numbers, treat as width/length for sills
-    if "cm" in text_low and "ml" in text_low and len(nums) >= 2:
-        latime_cm = float(nums[0])
-        lungime_ml = float(nums[1])
-        area_m2 = (latime_cm / 100.0) * lungime_ml
-    else:
-        # If "m2" or "metri patrati" appears and we have a number, treat as total area
-        if "m2" in text_low or "metri patrati" in text_low or "metri pătrați" in user_text:
-            if nums:
-                area_m2 = float(nums[0])
+    return area_m2, lat_cm, lng_ml
 
-    if not material or area_m2 is None:
-        vr = VoiceResponse()
-        g = vr.gather(input="speech", action="/collect", language="ro-RO", speech_timeout="auto")
-        if not material:
-            g.say("Ce material doresti? Avem gri, marmura alba cu dungi gri, marmura bej, gri antracit, "
-                  "negru galaxy, negru absolut sau steel black.")
-        else:
-            g.say("Care este suprafata in metri patrati sau, pentru glafuri, latimea in centimetri si lungimea in metri liniari?")
-        return Response(str(vr), mimetype="text/xml")
-
-    est = estimate_from_area(material, area_m2)
-    vr = VoiceResponse()
-    if est is None:
-        g = vr.gather(input="speech", action="/collect", language="ro-RO", speech_timeout="auto")
-        g.say("Ca sa estimez corect, am nevoie de materialul exact si suprafata totala in metri patrati "
-              "sau latimea in centimetri plus lungimea in metri liniari. Imi spui, te rog?")
-        return Response(str(vr), mimetype="text/xml")
-
-    g = vr.gather(input="speech", action="/final", language="ro-RO", speech_timeout="auto")
-    g.say(f"Estimarea orientativa este aproximativ {int(est)} lei, fara transport si operatii speciale. "
-          "Lucram exclusiv cu avans minim 50 la suta. "
-          "Iti trimit rezumatul pe WhatsApp? Spune da sau nu.")
-    push_lead_to_sheet({
-        "sursa": "apel",
-        "tip_lucrare": "necunoscut",
-        "material": material,
-        "suprafata_m2": area_m2,
-        "estimare_ron": est,
-        "observatii": "Lead draft automat din apel (MVP)."
-    })
-    return Response(str(vr), mimetype="text/xml")
-
-@app.route("/final", methods=["POST"])
-def final():
-    vr = VoiceResponse()
-    vr.say("Multumesc! Trimit rezumatul. O zi excelenta din partea MARMURFIT!")
-    vr.hangup()
-    return Response(str(vr), mimetype="text/xml")
-
+# ===========
+# HEALTH
+# ===========
 @app.route("/")
 def health():
     return "OK - MARMURFIT Voice Bot MVP"
-# --- SELFTEST START ---
+
+# ===========
+# SELFTEST
+# ===========
 @app.route("/selftest", methods=["GET"])
 def selftest():
-    import requests, time
     payload = {
         "sursa": "selftest-backend",
         "nume": "Test",
@@ -170,22 +104,91 @@ def selftest():
         status = r.status_code
     except Exception as e:
         status = f"ERR:{e}"
-    return f"SELFTEST -> Sheets status: {status} @ {time.strftime('%H:%M:%S')}"
-# --- SELFTEST END ---
+    return f"SELFTEST -> Sheets status: {status}"
 
-# --- TELNYX XML HELPER ---
-from flask import request  # dacă nu e deja importat mai sus
+# =================
+# TWILIO ROUTES
+# =================
+from twilio.twiml.voice_response import VoiceResponse
 
+VOICE_RO = "Polly.Carmen"  # voce RO stabilă (evită "silent")
+
+@app.route("/voice", methods=["GET","POST"])
+def voice():
+    vr = VoiceResponse()
+    g = vr.gather(
+        input="speech",
+        action="/collect",
+        language="ro-RO",
+        speech_timeout="auto"
+    )
+    g.say(
+        "Bună! Ai sunat la MARMURFIT. Pentru calitate, apelul poate fi înregistrat. "
+        "Îți pot face o estimare orientativă. Nu facem măsurători la domiciliu; lucrăm pe dimensiunile tale "
+        "și recomandăm toleranță de aproximativ doi centimetri la capete și în față, pentru că treptele ies "
+        "în exterior față de contratrepte. Spune materialul și suprafața în metri pătrați sau, pentru glafuri, "
+        "lățimea în centimetri și lungimea în metri liniari.",
+        language="ro-RO",
+        voice=VOICE_RO
+    )
+    vr.redirect("/voice")  # dacă nu vorbește
+    return Response(str(vr), mimetype="text/xml")
+
+@app.route("/collect", methods=["POST"])
+def collect():
+    user_text = request.form.get("SpeechResult", "") or ""
+    caller = request.form.get("From", "")
+
+    material = find_material_in_text(user_text)
+    area_m2, lat_cm, lng_ml = parse_area_from_text(user_text)
+    est = estimate_from_area(material, area_m2) if (material and area_m2 is not None) else None
+
+    vr = VoiceResponse()
+    if est is None:
+        g = vr.gather(input="speech", action="/collect", language="ro-RO", speech_timeout="auto")
+        if not material:
+            g.say("Ce material dorești? Avem gri, marmură albă cu dungi gri, marmură bej, gri antracit, negru galaxy, negru absolut sau steel black.",
+                  language="ro-RO", voice=VOICE_RO)
+        else:
+            g.say("Care este suprafața în metri pătrați sau, pentru glafuri, lățimea în centimetri și lungimea în metri liniari?",
+                  language="ro-RO", voice=VOICE_RO)
+        return Response(str(vr), mimetype="text/xml")
+
+    push_lead_to_sheet({
+        "sursa": "apel",
+        "nume": "",
+        "telefon": caller,
+        "localitate": "",
+        "tip_lucrare": "necunoscut",
+        "material": material,
+        "finisaj": "",
+        "grosime_cm": "",
+        "suprafata_m2": area_m2,
+        "latime_cm": lat_cm or "",
+        "lungime_ml": lng_ml or "",
+        "estimare_ron": est,
+        "status": "nou",
+        "observatii": "Lead automat Twilio",
+    })
+
+    vr.say(
+        f"Estimarea orientativă este aproximativ {int(est)} lei, fără transport și operații speciale. "
+        "Lucrăm exclusiv cu avans minim cincizeci la sută. Mulțumim!",
+        language="ro-RO", voice=VOICE_RO
+    )
+    vr.hangup()
+    return Response(str(vr), mimetype="text/xml")
+
+# =================
+# TELNYX ROUTES
+# =================
 def make_texml(xml_str: str):
     return Response(xml_str, mimetype="application/xml")
 
-# --- TELNYX PING (TEST) ---
 @app.route("/telnyx/ping", methods=["POST"])
 def telnyx_ping():
-    xml = "<Response><Say>Test Telnyx OK</Say><Hangup/></Response>"
-    return make_texml(xml)
-    
-    # --- TELNYX VOICE (ABSOLUTE URLS) ---
+    return make_texml("<Response><Say>Test Telnyx OK</Say><Hangup/></Response>")
+
 @app.route("/telnyx/voice", methods=["POST"])
 def telnyx_voice():
     base = request.url_root.rstrip("/")  # ex: https://marmurfit-voicebot.onrender.com
@@ -195,8 +198,8 @@ def telnyx_voice():
     <Say>
       Buna! Ai sunat la MARMURFIT. Pentru calitate, apelul poate fi inregistrat.
       Iti pot face o estimare orientativa. Nu facem masuratori la domiciliu; lucram pe dimensiunile tale
-      si recomandam toleranta de aproximativ doi centimetri la capete si in fata, pentru ca treptele
-      ies in exterior fata de contratrepte. Spune materialul si suprafata in metri patrati sau, la glafuri,
+      si recomandam toleranta de aproximativ doi centimetri la capete si in fata, pentru ca treptele ies
+      in exterior fata de contratrepte. Spune materialul si suprafata in metri patrati sau, la glafuri,
       latimea in centimetri si lungimea in metri liniari.
     </Say>
   </Gather>
@@ -208,11 +211,52 @@ def telnyx_voice():
 
 @app.route("/telnyx/collect", methods=["POST"])
 def telnyx_collect():
-    # TODO: păstrează aici logica ta de parsare + scriere în Sheets (ai deja codul)
-    # La final, răspuns minim:
-    xml = "<Response><Say>Multumim! Inchid.</Say><Hangup/></Response>"
+    user_text = request.form.get("SpeechResult", "") or ""
+    caller = request.form.get("From", "")
+
+    material = find_material_in_text(user_text)
+    area_m2, lat_cm, lng_ml = parse_area_from_text(user_text)
+    est = estimate_from_area(material, area_m2) if (material and area_m2 is not None) else None
+
+    if est is None:
+        base = request.url_root.rstrip("/")
+        xml = f"""
+<Response>
+  <Gather input="speech" language="ro-RO" action="{base}/telnyx/collect" method="POST" speechTimeout="auto">
+    <Say>Ca sa estimez corect, spune materialul si suprafata in metri patrati sau, la glafuri, latimea in centimetri si lungimea in metri liniari.</Say>
+  </Gather>
+  <Redirect method="POST">{base}/telnyx/voice</Redirect>
+</Response>
+""".strip()
+        return make_texml(xml)
+
+    push_lead_to_sheet({
+        "sursa": "apel-telnyx",
+        "nume": "",
+        "telefon": caller,
+        "localitate": "",
+        "tip_lucrare": "necunoscut",
+        "material": material,
+        "finisaj": "",
+        "grosime_cm": "",
+        "suprafata_m2": area_m2,
+        "latime_cm": lat_cm or "",
+        "lungime_ml": lng_ml or "",
+        "estimare_ron": est,
+        "status": "nou",
+        "observatii": "Lead automat Telnyx",
+    })
+
+    xml = f"""
+<Response>
+  <Say>Estimarea orientativa este aproximativ {int(est)} lei, fara transport si operatii speciale. Lucram cu avans minim cincizeci la suta. Multumim!</Say>
+  <Hangup/>
+</Response>
+""".strip()
     return make_texml(xml)
 
+# ===========
+# MAIN
+# ===========
 if __name__ == "__main__":
-    import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
