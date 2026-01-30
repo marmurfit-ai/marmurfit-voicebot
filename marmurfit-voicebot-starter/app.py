@@ -184,6 +184,34 @@ def make_texml(xml_str: str):
 def telnyx_ping():
     xml = "<Response><Say>Test Telnyx OK</Say><Hangup/></Response>"
     return make_texml(xml)
+    
+    # --- TELNYX VOICE (ABSOLUTE URLS) ---
+@app.route("/telnyx/voice", methods=["POST"])
+def telnyx_voice():
+    base = request.url_root.rstrip("/")  # ex: https://marmurfit-voicebot.onrender.com
+    xml = f"""
+<Response>
+  <Gather input="speech" language="ro-RO" action="{base}/telnyx/collect" method="POST" speechTimeout="auto">
+    <Say>
+      Buna! Ai sunat la MARMURFIT. Pentru calitate, apelul poate fi inregistrat.
+      Iti pot face o estimare orientativa. Nu facem masuratori la domiciliu; lucram pe dimensiunile tale
+      si recomandam toleranta de aproximativ doi centimetri la capete si in fata, pentru ca treptele
+      ies in exterior fata de contratrepte. Spune materialul si suprafata in metri patrati sau, la glafuri,
+      latimea in centimetri si lungimea in metri liniari.
+    </Say>
+  </Gather>
+  <Say>Nu am auzit nimic. Reincerc.</Say>
+  <Redirect method="POST">{base}/telnyx/voice</Redirect>
+</Response>
+""".strip()
+    return make_texml(xml)
+
+@app.route("/telnyx/collect", methods=["POST"])
+def telnyx_collect():
+    # TODO: păstrează aici logica ta de parsare + scriere în Sheets (ai deja codul)
+    # La final, răspuns minim:
+    xml = "<Response><Say>Multumim! Inchid.</Say><Hangup/></Response>"
+    return make_texml(xml)
 
 if __name__ == "__main__":
     import os
