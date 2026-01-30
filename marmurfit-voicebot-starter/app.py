@@ -179,6 +179,12 @@ from flask import request  # dacă nu e deja importat mai sus
 def make_texml(xml_str: str):
     return Response(xml_str, mimetype="application/xml")
 
+# --- TELNYX PING (TEST) ---
+@app.route("/telnyx/ping", methods=["POST"])
+def telnyx_ping():
+    xml = "<Response><Say>Test Telnyx OK</Say><Hangup/></Response>"
+    return make_texml(xml)
+
 if __name__ == "__main__":
     import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
