@@ -1,4 +1,4 @@
-# app.py (reset minim)
+# app.py (minimal sanity file)
 import os
 from flask import Flask
 
