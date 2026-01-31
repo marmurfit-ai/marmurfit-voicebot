@@ -3,96 +3,136 @@ import re
 import requests
 from flask import Flask, request, Response, make_response
 from werkzeug.middleware.proxy_fix import ProxyFix
+from twilio.twiml.voice_response import VoiceResponse, Gather
 
 app = Flask(__name__)
-from werkzeug.middleware.proxy_fix import ProxyFix
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-BASE_URL = "https://marmurfit-voicebot.onrender.com"
-
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# FORȚAT până terminăm: URL PUBLIC HTTPS al service-ului tău
+# URL public HTTPS al serviciului (forțat – necesar pentru Telnyx)
 BASE_URL = "https://marmurfit-voicebot.onrender.com"
 
+# Webhook-ul tău spre Sheets (Apps Script)
 LEADS_WEBHOOK_URL = os.getenv("LEADS_WEBHOOK_URL", "")
+
+# Voce RO stabilă
 VOICE_RO = "Polly.Carmen"
 
+# Materiale + prețuri orientative (lei/m²)
 MATERIALS = {
-    "gri": 350, "marmura alba": 350, "dungi gri": 350, "bej": 350,
-    "gri antracit": 350, "steel black": 650, "negru galaxy": 750, "negru absolut": 750,
+    "gri": 350,
+    "marmura alba": 350, "dungi gri": 350, "bej": 350, "gri antracit": 350,
+    "steel black": 650, "negru galaxy": 750, "negru absolut": 750,
 }
 
-def push_lead(payload: dict):
-    if not LEADS_WEBHOOK_URL: return
-    try: requests.post(LEADS_WEBHOOK_URL, json=payload, timeout=10)
-    except Exception as e: print("LEADS push error:", e)
+def push_lead(payload: dict) -> None:
+    """Trimite lead-ul în Google Sheet (dacă avem LEADS_WEBHOOK_URL)."""
+    if not LEADS_WEBHOOK_URL:
+        return
+    try:
+        requests.post(LEADS_WEBHOOK_URL, json=payload, timeout=10)
+    except Exception as e:
+        print("LEADS push error:", e)
 
 def parse_area_and_material(text: str):
+    """
+    Extrage materialul + aria:
+      - „<material> <X> m2” (metri pătrați)
+      - glafuri: „lățime <cm> cm, lungime <ml> metri liniari” -> aria = (cm/100)*ml
+    Returnează: (material, area_m2, estimare_ron) sau (None, None, None)
+    """
     t = (text or "").lower()
+
     material = next((m for m in MATERIALS if m in t), None)
+
     nums = [n.replace(",", ".") for n in re.findall(r"[0-9]+[.,]?[0-9]*", t)]
     area_m2 = None
-    if "cm" in t and "ml" in t and len(nums) >= 2:
-        lat_cm = float(nums[0]); lng_ml = float(nums[1]); area_m2 = (lat_cm/100.0)*lng_ml
+    if "cm" in t and ("ml" in t or "metri liniari" in t) and len(nums) >= 2:
+        lat_cm = float(nums[0]); lng_ml = float(nums[1])
+        area_m2 = (lat_cm / 100.0) * lng_ml
     elif ("m2" in t) or ("metri patrati" in t) or ("metri pătrați" in t):
-        if nums: area_m2 = float(nums[0])
+        if nums:
+            area_m2 = float(nums[0])
+
     est = int(round(area_m2 * MATERIALS[material])) if (material and area_m2 is not None) else None
     return material, area_m2, est
 
-def make_texml(xml_str: str):
-    r = make_response(xml_str); r.headers["Content-Type"] = "application/xml"; return r
+def make_texml(xml_str: str) -> Response:
+    r = make_response(xml_str)
+    r.headers["Content-Type"] = "application/xml"
+    return r
 
+# ---------- Health & Selftest ----------
 @app.route("/")
-def health(): return "OK - MARMURFIT Voice Bot MVP"
+def health():
+    return "OK - MARMURFIT Voice Bot MVP"
 
 @app.route("/selftest", methods=["GET"])
 def selftest():
-    payload = {"sursa":"selftest-backend","nume":"Test","telefon":"","localitate":"",
-               "tip_lucrare":"glafuri","material":"gri","finisaj":"","grosime_cm":"2",
-               "suprafata_m2":1,"latime_cm":"","lungime_ml":"","estimare_ron":350,
-               "status":"nou","observatii":"trigger din /selftest"}
-    try: status = requests.post(LEADS_WEBHOOK_URL, json=payload, timeout=10).status_code
-    except Exception as e: status = f"ERR:{e}"
+    payload = {
+        "sursa": "selftest-backend", "nume": "Test", "telefon": "", "localitate": "",
+        "tip_lucrare": "glafuri", "material": "gri", "finisaj": "", "grosime_cm": "2",
+        "suprafata_m2": 1, "latime_cm": "", "lungime_ml": "", "estimare_ron": 350,
+        "status": "nou", "observatii": "trigger din /selftest"
+    }
+    try:
+        status = requests.post(LEADS_WEBHOOK_URL, json=payload, timeout=10).status_code
+    except Exception as e:
+        status = f"ERR:{e}"
     return f"SELFTEST -> Sheets status: {status}"
 
-# ===== TWILIO (opțional) =====
+# ---------- TWILIO (opțional) ----------
 @app.route("/voice", methods=["GET","POST"])
 def voice():
     vr = VoiceResponse()
     g = Gather(input="speech", action="/collect", language="ro-RO", speech_timeout="auto")
-    g.say("Bună! Ai sunat la MARMURFIT. Pentru calitate, apelul poate fi înregistrat. "
-          "Nu facem măsurători la domiciliu; lucrăm pe dimensiunile tale și recomandăm toleranță de ~ doi centimetri "
-          "la capete și în față, pentru că treptele ies în exterior față de contratrepte. "
-          "Spune materialul și suprafața în metri pătrați, sau pentru glafuri, lățimea în centimetri și lungimea în metri liniari.",
-          language="ro-RO", voice=VOICE_RO)
-    vr.append(g); vr.redirect("/voice")
+    g.say(
+        "Bună! Ai sunat la MARMURFIT. Pentru calitate, apelul poate fi înregistrat. "
+        "Nu facem măsurători la domiciliu; lucrăm pe dimensiunile tale și recomandăm toleranță de aproximativ doi centimetri "
+        "la capete și în față, pentru că treptele ies în exterior față de contratrepte. "
+        "Spune materialul și suprafața în metri pătrați, sau pentru glafuri, lățimea în centimetri și lungimea în metri liniari.",
+        language="ro-RO", voice=VOICE_RO
+    )
+    vr.append(g)
+    vr.redirect("/voice")
     return Response(str(vr), mimetype="text/xml")
 
 @app.route("/collect", methods=["POST"])
 def collect():
     user_text = (request.form.get("SpeechResult") or "").lower()
     material, area_m2, est = parse_area_and_material(user_text)
-    push_lead({"sursa":"apel","material":material or "","suprafata_m2":area_m2 or "","estimare_ron":est or "","observatii":"Lead draft automat (Twilio)."})
+
+    push_lead({
+        "sursa": "apel", "material": material or "", "suprafata_m2": area_m2 or "",
+        "estimare_ron": est or "", "observatii": "Lead draft automat (Twilio)."
+    })
+
     vr = VoiceResponse()
     if est is None:
         g = vr.gather(input="speech", action="/collect", language="ro-RO", speech_timeout="auto")
-        g.say("Ca să estimez, spune materialul și suprafața în metri pătrați sau, pentru glafuri, lățimea în centimetri și lungimea în metri liniari.",
-              language="ro-RO", voice=VOICE_RO)
-        vr.append(g); vr.redirect("/voice")
+        g.say(
+            "Ca să estimez, spune materialul și suprafața în metri pătrați, "
+            "sau pentru glafuri, lățimea în centimetri și lungimea în metri liniari.",
+            language="ro-RO", voice=VOICE_RO
+        )
+        vr.append(g)
+        vr.redirect("/voice")
     else:
-        vr.say(f"Estimarea orientativă este aproximativ {int(est)} lei, fără transport și operații speciale. "
-               "Lucrăm exclusiv cu avans minim cincizeci la sută. Mulțumim!", language="ro-RO", voice=VOICE_RO)
+        vr.say(
+            f"Estimarea orientativă este aproximativ {int(est)} lei, fără transport și operații speciale. "
+            "Lucrăm exclusiv cu avans minim cincizeci la sută. Mulțumim!",
+            language="ro-RO", voice=VOICE_RO
+        )
         vr.hangup()
     return Response(str(vr), mimetype="text/xml")
 
-# ===== TELNYX (PROD) =====
+# ---------- TELNYX (PROD) ----------
 @app.route("/telnyx/ping", methods=["GET","POST"])
 def telnyx_ping():
     return make_texml(f'<Response><Say voice="{VOICE_RO}">Test Telnyx OK</Say><Hangup/></Response>')
 
 @app.route("/telnyx/voice", methods=["GET","POST"])
 def telnyx_voice():
-    base = BASE_URL
+    base = BASE_URL  # forțăm HTTPS absolut
     return make_texml(f"""
 <Response>
   <Gather input="speech" language="ro-RO" action="{base}/telnyx/collect" method="POST" speechTimeout="auto">
@@ -114,10 +154,20 @@ def telnyx_collect():
         request.form.get("SpeechResult") or request.form.get("speechResult")
         or request.form.get("Speech") or request.form.get("speech") or ""
     ).lower()
+
     material, area_m2, est = parse_area_and_material(user_text)
-    push_lead({"sursa":"apel-telnyx","material":material or "","suprafata_m2":area_m2 or "","estimare_ron":est or "","observatii":"Lead draft automat Telnyx (MVP)."})
-    base = BASE_URL
-        if est is None:
+
+    push_lead({
+        "sursa": "apel-telnyx",
+        "material": material or "",
+        "suprafata_m2": area_m2 or "",
+        "estimare_ron": est or "",
+        "observatii": "Lead draft automat Telnyx (MVP)."
+    })
+
+    base = BASE_URL  # forțăm HTTPS
+
+    if est is None:
         return make_texml(f"""
 <Response>
   <Gather input="speech" language="ro-RO" action="{base}/telnyx/collect" method="POST" speechTimeout="auto">
@@ -130,6 +180,7 @@ def telnyx_collect():
   <Redirect method="POST">{base}/telnyx/voice</Redirect>
 </Response>
 """.strip())
+
     return make_texml(f"""
 <Response>
   <Say voice="{VOICE_RO}">
