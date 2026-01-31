@@ -5,6 +5,10 @@ from flask import Flask, request, Response, make_response
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+BASE_URL = "https://marmurfit-voicebot.onrender.com"
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # FORȚAT până terminăm: URL PUBLIC HTTPS al service-ului tău
@@ -88,7 +92,7 @@ def telnyx_ping():
 
 @app.route("/telnyx/voice", methods=["GET","POST"])
 def telnyx_voice():
-    base = request.url_root.rstrip("/")
+    base = BASE_URL
     return make_texml(f"""
 <Response>
   <Gather input="speech" language="ro-RO" action="{base}/telnyx/collect" method="POST" speechTimeout="auto">
@@ -112,8 +116,8 @@ def telnyx_collect():
     ).lower()
     material, area_m2, est = parse_area_and_material(user_text)
     push_lead({"sursa":"apel-telnyx","material":material or "","suprafata_m2":area_m2 or "","estimare_ron":est or "","observatii":"Lead draft automat Telnyx (MVP)."})
-    base = request.url_root.rstrip("/")
-    if est is None:
+    base = BASE_URL
+        if est is None:
         return make_texml(f"""
 <Response>
   <Gather input="speech" language="ro-RO" action="{base}/telnyx/collect" method="POST" speechTimeout="auto">
