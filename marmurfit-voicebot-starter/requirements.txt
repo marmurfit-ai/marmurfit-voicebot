@@ -1,4 +1,4 @@
-flask
-twilio
-requests
-gunicorn
+Flask>=3,<4
+Werkzeug>=3,<4
+requests>=2
+twilio>=9
