@@ -2,9 +2,13 @@ import os
 import re
 import requests
 from flask import Flask, request, Response, make_response
-from twilio.twiml.voice_response import VoiceResponse, Gather
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# FORȚAT până terminăm: URL PUBLIC HTTPS al service-ului tău
+BASE_URL = "https://marmurfit-voicebot.onrender.com"
 
 LEADS_WEBHOOK_URL = os.getenv("LEADS_WEBHOOK_URL", "")
 VOICE_RO = "Polly.Carmen"
